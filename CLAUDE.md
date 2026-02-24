@@ -121,6 +121,7 @@ After changes, smoke test: `cxp-canary --help`
 ### Boundaries
 - Do not create PRs or install tools. Push the branch and stop. The developer creates PRs manually.
 - Do not attempt to install CLI tools (gh, hub, etc.)
+- Do not create implementation plan files, design docs, or any docs/plans/ directory in the repo. NEVER commit plan files. If subagent-driven development requires a plan file, write it to the system temp directory (e.g., `$TEMP/`), not the repo. Plans are transient session artifacts, not project documentation.
 
 ## Session Discipline
 

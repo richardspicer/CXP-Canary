@@ -8,7 +8,14 @@ from pathlib import Path
 import click
 
 from cxp_canary import __version__
-from cxp_canary.evidence import create_campaign, get_campaign, get_db, record_result
+from cxp_canary.evidence import (
+    create_campaign,
+    get_campaign,
+    get_db,
+    list_campaigns,
+    list_results,
+    record_result,
+)
 from cxp_canary.formats import list_formats
 from cxp_canary.objectives import list_objectives
 from cxp_canary.techniques import get_technique, list_techniques
@@ -147,3 +154,52 @@ def record(
 
     click.echo(f"Result:   {result.id}")
     click.echo(f"Campaign: {campaign.id}")
+
+
+@main.command()
+@click.argument("campaign_id", required=False, default=None)
+@click.option(
+    "--db",
+    "db_path",
+    default=None,
+    type=click.Path(path_type=Path),
+    help="Database path (default: ./cxp-canary.db).",
+)
+def campaigns(campaign_id: str | None, db_path: Path | None) -> None:
+    """List campaigns and results."""
+    conn = get_db(db_path)
+
+    if campaign_id is None:
+        # List all campaigns
+        camps = list_campaigns(conn)
+        if not camps:
+            click.echo("No campaigns found.")
+            conn.close()
+            return
+        click.echo(f"{'ID':<38} {'Name':<30} {'Created':<22} Results")
+        click.echo("-" * 95)
+        for c in camps:
+            count = len(list_results(conn, c.id))
+            created_str = c.created.strftime("%Y-%m-%d %H:%M")
+            click.echo(f"{c.id:<38} {c.name:<30} {created_str:<22} {count}")
+    else:
+        # Show campaign detail
+        campaign = get_campaign(conn, campaign_id)
+        if campaign is None:
+            conn.close()
+            raise click.UsageError(f"Campaign not found: {campaign_id}")
+        click.echo(f"Campaign: {campaign.name}")
+        click.echo(f"ID:       {campaign.id}")
+        click.echo(f"Created:  {campaign.created.isoformat()}")
+        if campaign.description:
+            click.echo(f"Desc:     {campaign.description}")
+        results = list_results(conn, campaign.id)
+        click.echo(f"\nResults ({len(results)}):")
+        if results:
+            click.echo(f"  {'ID':<38} {'Technique':<30} {'Assistant':<20} Status")
+            click.echo("  " + "-" * 93)
+            for r in results:
+                click.echo(
+                    f"  {r.id:<38} {r.technique_id:<30} {r.assistant:<20} {r.validation_result}"
+                )
+    conn.close()

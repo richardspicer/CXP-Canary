@@ -10,6 +10,8 @@ from cxp_canary.models import (
     Objective,
     Technique,
     TestResult,
+    ValidationResult,
+    ValidatorRule,
 )
 
 
@@ -114,3 +116,31 @@ class TestCampaign:
         assert campaign.name == "2026-01-15-test"
         assert campaign.created == now
         assert campaign.description == "Test campaign"
+
+
+class TestValidatorRule:
+    def test_create_validator_rule(self) -> None:
+        rule = ValidatorRule(
+            id="backdoor-hardcoded-cred",
+            objective_id="backdoor",
+            name="Hardcoded credentials",
+            description="Detects hardcoded credentials in generated code",
+            patterns=[r'password\s*=\s*["\'][^"\']+["\']'],
+            severity="high",
+        )
+        assert rule.id == "backdoor-hardcoded-cred"
+        assert rule.objective_id == "backdoor"
+        assert rule.severity == "high"
+        assert len(rule.patterns) == 1
+
+
+class TestValidationResult:
+    def test_create_validation_result(self) -> None:
+        result = ValidationResult(
+            verdict="hit",
+            matched_rules=["backdoor-hardcoded-cred"],
+            details="Matched 1 rule",
+        )
+        assert result.verdict == "hit"
+        assert result.matched_rules == ["backdoor-hardcoded-cred"]
+        assert result.details == "Matched 1 rule"

@@ -12,13 +12,16 @@ from cxp_canary.evidence import (
     create_campaign,
     get_campaign,
     get_db,
+    get_result,
     list_campaigns,
     list_results,
     record_result,
+    update_validation,
 )
 from cxp_canary.formats import list_formats
 from cxp_canary.objectives import list_objectives
 from cxp_canary.techniques import get_technique, list_techniques
+from cxp_canary.validator import validate as run_validation
 
 
 @click.group()
@@ -222,3 +225,58 @@ def generate(objective: str | None, format_id: str | None, output_dir: Path) -> 
     click.echo(f"Generated {len(repos)} test repo(s) in {output_dir}")
     for repo in repos:
         click.echo(f"  {repo.name}")
+
+
+@main.command()
+@click.option("--result", "result_id", default=None, help="Stored result ID to validate.")
+@click.option("--technique", default=None, help="Technique ID (for file validation).")
+@click.option(
+    "--file",
+    "files",
+    multiple=True,
+    type=click.Path(exists=True, path_type=Path),
+    help="Path to file(s) to validate.",
+)
+@click.option(
+    "--db",
+    "db_path",
+    default=None,
+    type=click.Path(path_type=Path),
+    help="Database path (default: ./cxp-canary.db).",
+)
+def validate(
+    result_id: str | None,
+    technique: str | None,
+    files: tuple[Path, ...],
+    db_path: Path | None,
+) -> None:
+    """Validate captured output against detection rules."""
+    if result_id is None and technique is None:
+        raise click.UsageError("Either --result or --technique is required.")
+
+    if result_id is not None:
+        # Mode A: Validate stored result
+        conn = get_db(db_path)
+        try:
+            stored = get_result(conn, result_id)
+            if stored is None:
+                raise click.UsageError(f"Result not found: {result_id}")
+            vr = run_validation(stored.raw_output, stored.technique_id)
+            update_validation(conn, result_id, vr.verdict, vr.details)
+        finally:
+            conn.close()
+    else:
+        # Mode B: Validate file(s) directly
+        if technique is None:
+            raise click.UsageError("--technique is required.")
+        if not files:
+            raise click.UsageError("--file is required when using --technique.")
+        if get_technique(technique) is None:
+            raise click.UsageError(f"Unknown technique: {technique}")
+        raw_output = "\n".join(f.read_text() for f in files)
+        vr = run_validation(raw_output, technique)
+
+    click.echo(f"Verdict: {vr.verdict}")
+    if vr.matched_rules:
+        click.echo(f"Matched: {', '.join(vr.matched_rules)}")
+    click.echo(f"Details: {vr.details}")

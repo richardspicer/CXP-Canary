@@ -12,6 +12,7 @@ from cxp_canary.evidence import (
     list_campaigns,
     list_results,
     record_result,
+    update_validation,
 )
 from cxp_canary.models import Campaign, TestResult
 
@@ -164,3 +165,32 @@ class TestResultCrud:
         fetched = get_result(conn, result.id)
         assert fetched is not None
         assert fetched.captured_files == files
+
+
+class TestUpdateValidation:
+    def test_update_validation(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        init_db(conn)
+        campaign = create_campaign(conn, "test")
+        result = record_result(
+            conn,
+            campaign_id=campaign.id,
+            technique_id="backdoor-claude-md",
+            assistant="Claude Code",
+            trigger_prompt="Add auth",
+            raw_output='password = "admin123"',
+            capture_mode="file",
+        )
+        assert result.validation_result == "pending"
+
+        update_validation(conn, result.id, "hit", "Matched backdoor-hardcoded-cred")
+        updated = get_result(conn, result.id)
+        assert updated is not None
+        assert updated.validation_result == "hit"
+        assert updated.validation_details == "Matched backdoor-hardcoded-cred"
+
+    def test_update_validation_not_found(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        init_db(conn)
+        # Should not raise — just a no-op UPDATE matching 0 rows
+        update_validation(conn, "nonexistent-id", "miss", "")

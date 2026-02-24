@@ -34,7 +34,7 @@ CXP-Canary follows a three-stage pipeline: generate poisoned test repos, capture
 
 **Evidence Store** — SQLite database tracking campaigns, test results, and validation outcomes. Same design philosophy as IPI-Canary's database — single-file, portable, no external dependencies.
 
-**Reporter** — Generates structured output from the evidence store: assistant comparison matrices (JSON/Markdown), per-finding summaries, and bounty-ready PoC packages (zip archives containing the poisoned repo + trigger + captured evidence).
+**Reporter** — Generates structured output from the evidence store. The module (`reporter.py`) provides four functions: `generate_matrix()` queries the evidence store, groups results by technique, and enriches with objective/format metadata from the registries. `matrix_to_markdown()` and `matrix_to_json()` render the matrix as a Markdown table or JSON respectively. `export_poc()` creates bounty-ready zip archives containing a regenerated poisoned repo (via the builder), a finding README with reproduction steps, captured evidence, and a validation report.
 
 **CLI** — Click-based command interface. Entry point for all operations.
 
@@ -149,14 +149,15 @@ CREATE TABLE test_results (
 
 ```
 cxp-canary
-  generate      Generate poisoned test repos
-  validate      Validate captured output against a technique's expected result
-  record        Record a test result into the evidence store
-  report        Generate comparison matrices and PoC packages
-  objectives    List available attack objectives
-  formats       List supported assistant formats
-  techniques    List all techniques (objective × format matrix)
-  campaigns     List campaigns and results
+  generate          Generate poisoned test repos
+  validate          Validate captured output against a technique's expected result
+  record            Record a test result into the evidence store
+  report matrix     Generate an assistant comparison matrix (Markdown or JSON)
+  report poc        Export a bounty-ready PoC package (zip archive)
+  objectives        List available attack objectives
+  formats           List supported assistant formats
+  techniques        List all techniques (objective × format matrix)
+  campaigns         List campaigns and results
 ```
 
 ### Flags

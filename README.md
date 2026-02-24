@@ -33,12 +33,13 @@ cxp-canary report           # Generate comparison matrices and PoC packages
 
 ## Responsible Use
 
-CXP-Canary is a security testing tool for authorized research. Test only against:
-- Coding assistants you have permission to test
-- Vendors with active bug bounty programs or vulnerability disclosure policies
-- Your own local instances
+CXP-Canary is for **authorized security testing only**. By using this tool, you agree to the following:
 
-Do not submit poisoned context files to vendor APIs without authorization.
+- **Test only what you're authorized to test.** Use against your own local instances, or against vendors with active bug bounty programs or vulnerability disclosure policies. Do not test against systems without explicit permission.
+- **Handle generated repos with care.** Test repositories contain intentionally malicious instruction files designed to manipulate coding assistants. Never deploy them to production environments or shared workspaces where they could affect others.
+- **Follow responsible disclosure.** When you discover a vulnerability, report it through the vendor's official disclosure channel. Do not publish findings publicly until the vendor has had reasonable time to respond.
+- **No automated assistant interaction.** CXP-Canary generates test repos and captures evidence, but the researcher manually controls all interactions with coding assistants. The tool does not automatically submit prompts or interact with any AI assistant.
+- **No malware, no production attacks.** Do not use CXP-Canary to create actual malware, attack production systems, or cause harm. This is a research tool for improving AI safety.
 
 ## Documentation
 

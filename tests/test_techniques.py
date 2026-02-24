@@ -39,8 +39,25 @@ class TestTechniqueRegistry:
     def test_get_unknown_returns_none(self) -> None:
         assert get_technique("nonexistent") is None
 
-    def test_all_techniques_have_stub_templates(self) -> None:
+    def test_all_techniques_have_real_templates(self) -> None:
         techniques = list_techniques()
         for tech in techniques:
-            assert "TODO" in tech.template
-            assert "TODO" in tech.trigger_prompt
+            assert "TODO" not in tech.template
+            assert len(tech.template) > 50
+
+    def test_all_techniques_have_real_trigger_prompts(self) -> None:
+        techniques = list_techniques()
+        for tech in techniques:
+            assert "TODO" not in tech.trigger_prompt
+            assert len(tech.trigger_prompt) > 20
+
+    def test_backdoor_templates_contain_credentials(self) -> None:
+        tech = get_technique("backdoor-claude-md")
+        assert tech is not None
+        assert "admin" in tech.template
+        assert "admin123" in tech.template
+
+    def test_exfil_templates_contain_telemetry(self) -> None:
+        tech = get_technique("exfil-claude-md")
+        assert tech is not None
+        assert "telemetry" in tech.template.lower()

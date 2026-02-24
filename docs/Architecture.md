@@ -180,10 +180,10 @@ cxp-canary
 
 ### Adding a New Technique
 
-1. Create technique template in `src/cxp_canary/techniques/{objective_id}/{format_id}/`
-2. Define the poisoned file template + trigger prompt + project skeleton
-3. Register in the technique registry
-4. Techniques are the cross-product — one objective applied to one format
+1. Create technique template in `src/cxp_canary/techniques/templates/{objective_id}/{format_id}.{ext}.j2`
+2. Add trigger prompt to `_TRIGGER_PROMPTS` in `src/cxp_canary/techniques/__init__.py`
+3. Techniques are the cross-product — one objective applied to one format
+4. New objectives or formats automatically generate new technique combinations
 
 ---
 

@@ -143,3 +143,4 @@ class TestValidationResult:
         )
         assert result.verdict == "hit"
         assert result.matched_rules == ["backdoor-hardcoded-cred"]
+        assert result.details == "Matched 1 rule"

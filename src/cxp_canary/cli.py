@@ -203,3 +203,22 @@ def campaigns(campaign_id: str | None, db_path: Path | None) -> None:
                     f"  {r.id:<38} {r.technique_id:<30} {r.assistant:<20} {r.validation_result}"
                 )
     conn.close()
+
+
+@main.command()
+@click.option("--objective", default=None, help="Filter by objective ID.")
+@click.option("--format", "format_id", default=None, help="Filter by format ID.")
+@click.option(
+    "--output-dir",
+    default="./repos",
+    type=click.Path(path_type=Path),
+    help="Output directory (default: ./repos).",
+)
+def generate(objective: str | None, format_id: str | None, output_dir: Path) -> None:
+    """Generate poisoned test repositories."""
+    from cxp_canary.builder import build_all
+
+    repos = build_all(output_dir, objective=objective, format_id=format_id)
+    click.echo(f"Generated {len(repos)} test repo(s) in {output_dir}")
+    for repo in repos:
+        click.echo(f"  {repo.name}")

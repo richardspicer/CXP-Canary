@@ -1,0 +1,93 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cxp-canary"
+version = "0.1.0"
+description = "Context poisoning tester for AI coding assistants"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Richard Spicer", email = "richard@richardspicer.io" },
+]
+keywords = ["security", "ai-security", "coding-assistant", "context-poisoning", "prompt-injection", "red-team"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Testing",
+    "Typing :: Typed",
+]
+dependencies = [
+    "click>=8.3",
+    "jinja2>=3.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.15",
+    "pre-commit>=4.5",
+    "mypy>=1.19",
+]
+
+[project.scripts]
+cxp-canary = "cxp_canary.cli:main"
+
+[project.urls]
+Homepage = "https://richardspicer.io"
+Repository = "https://github.com/richardspicer/CXP-Canary"
+Issues = "https://github.com/richardspicer/CXP-Canary/issues"
+Documentation = "https://github.com/richardspicer/CXP-Canary/tree/main/docs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cxp_canary"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort (import sorting)
+    "N",    # pep8-naming
+    "W",    # pycodestyle warnings
+    "B",    # flake8-bugbear (common bugs)
+    "C90",  # mccabe complexity
+    "UP",   # pyupgrade (modernize syntax)
+    "S",    # flake8-bandit (security)
+]
+ignore = [
+    "S101",  # assert usage (fine in tests)
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S"]  # Tests: skip security checks
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true

@@ -1,0 +1,202 @@
+# CXP-Canary — Design
+
+## Architecture
+
+CXP-Canary follows a three-stage pipeline: generate poisoned test repos, capture evidence from manual testing, and validate/report results.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     CXP-Canary CLI                      │
+│  generate │ validate │ report │ objectives │ formats    │
+└─────┬─────┴─────┬────┴────┬───┴────────────┴───────────┘
+      │           │         │
+      ▼           ▼         ▼
+┌──────────┐ ┌──────────┐ ┌──────────┐
+│ Payload  │ │ Output   │ │ Reporter │
+│ Engine   │ │ Validator│ │          │
+└────┬─────┘ └────┬─────┘ └────┬─────┘
+     │            │             │
+     ▼            ▼             ▼
+┌──────────┐ ┌──────────┐ ┌──────────┐
+│ Repo     │ │ Evidence │ │ Artifacts│
+│ Builder  │ │ Store    │ │ (PoCs,   │
+│          │ │ (SQLite) │ │ reports) │
+└──────────┘ └──────────┘ └──────────┘
+```
+
+### Component Descriptions
+
+**Payload Engine** — Selects and renders poisoned context file content from the technique registry. Each technique is an objective × format combination. The engine resolves the template, injects any dynamic content (target function names, exfil URLs), and produces the poisoned file content.
+
+**Repo Builder** — Packages poisoned context files into minimal, self-contained test repositories. Each repo contains: the poisoned instruction file, a minimal project skeleton (enough code for the assistant to have context), a trigger prompt file (`TRIGGER.md`) documenting the exact prompt the researcher should use, and a `README.md` with testing instructions.
+
+**Output Validator** — Evaluates captured assistant output against expected vulnerability signatures. Phase 1 uses regex pattern matching with per-objective rule sets. Each objective defines what constitutes a "hit" — e.g., backdoor insertion requires a hardcoded credential or bypass condition in the generated code.
+
+**Evidence Store** — SQLite database tracking campaigns, test results, and validation outcomes. Same design philosophy as IPI-Canary's database — single-file, portable, no external dependencies.
+
+**Reporter** — Generates structured output from the evidence store: assistant comparison matrices (JSON/Markdown), per-finding summaries, and bounty-ready PoC packages (zip archives containing the poisoned repo + trigger + captured evidence).
+
+**CLI** — Click-based command interface. Entry point for all operations.
+
+---
+
+## Data Models
+
+```python
+@dataclass
+class Objective:
+    """What the payload tries to achieve."""
+    id: str                  # e.g., "backdoor", "exfil", "dep-confusion"
+    name: str                # Human-readable name
+    description: str         # What success looks like
+    validators: list[str]    # Validator rule IDs that detect this objective
+
+@dataclass
+class AssistantFormat:
+    """Instruction file format for a specific coding assistant."""
+    id: str                  # e.g., "claude-md", "cursorrules"
+    filename: str            # e.g., "CLAUDE.md", ".cursorrules"
+    assistant: str           # e.g., "Claude Code", "Cursor"
+    syntax: str              # "markdown", "json", "plaintext"
+
+@dataclass
+class Technique:
+    """A specific payload: one objective in one format."""
+    id: str                  # e.g., "backdoor-claude-md-001"
+    objective: Objective
+    format: AssistantFormat
+    template: str            # Jinja2 or string template for the poisoned file
+    trigger_prompt: str      # The prompt the researcher uses to activate
+    project_type: str        # "python", "javascript", "generic"
+
+@dataclass
+class TestResult:
+    """One test execution: one technique against one assistant."""
+    id: str                  # UUID
+    campaign_id: str         # Groups results from a testing session
+    technique_id: str
+    assistant: str           # Which assistant was actually tested
+    model: str               # Underlying model if known
+    timestamp: datetime
+    trigger_prompt: str      # Actual prompt used
+    capture_mode: str        # "file" or "output" — how evidence was captured
+    captured_files: list[str]  # Paths to captured files (file mode)
+    raw_output: str          # Full text content (output mode) or concatenated file contents
+    validation_result: str   # "hit", "miss", "partial", "error"
+    validation_details: str  # What the validator found
+    notes: str               # Researcher observations
+
+@dataclass
+class Campaign:
+    """A testing session grouping multiple test results."""
+    id: str                  # UUID
+    name: str                # e.g., "2026-03-01-cursor-backdoors"
+    created: datetime
+    description: str
+```
+
+---
+
+## Schema
+
+### SQLite Tables
+
+```sql
+CREATE TABLE campaigns (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    created TEXT NOT NULL,
+    description TEXT
+);
+
+CREATE TABLE test_results (
+    id TEXT PRIMARY KEY,
+    campaign_id TEXT NOT NULL REFERENCES campaigns(id),
+    technique_id TEXT NOT NULL,
+    assistant TEXT NOT NULL,
+    model TEXT,
+    timestamp TEXT NOT NULL,
+    trigger_prompt TEXT NOT NULL,
+    raw_output TEXT NOT NULL,
+    validation_result TEXT NOT NULL,
+    validation_details TEXT,
+    notes TEXT
+);
+```
+
+---
+
+## CLI Interface
+
+```
+cxp-canary
+  generate      Generate poisoned test repos
+  validate      Validate captured output against a technique's expected result
+  record        Record a test result into the evidence store
+  report        Generate comparison matrices and PoC packages
+  objectives    List available attack objectives
+  formats       List supported assistant formats
+  techniques    List all techniques (objective × format matrix)
+  campaigns     List campaigns and results
+```
+
+### Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--objective` | str | all | Filter by objective ID |
+| `--format` | str | all | Filter by assistant format ID |
+| `--output-dir` | path | `./repos` | Where to write generated test repos |
+| `--campaign` | str | (auto) | Campaign ID for recording results |
+| `--assistant` | str | (required) | Assistant under test (for record/validate) |
+| `--model` | str | (optional) | Underlying model if known |
+| `--file` | path | (required*) | Path to assistant-generated code file(s) for evidence capture |
+| `--output-file` | path | (required*) | Path to raw text capture file (alternative to --file) |
+| `--technique` | str | (required) | Technique ID for record/validate |
+
+*`record` and `validate` require either `--file` or `--output-file`, not both.
+
+**Evidence capture modes:**
+- `--file` (primary): Point at file(s) the assistant wrote or modified in the test repo. This is the natural flow — coding assistants write to disk.
+- `--output-file` (fallback): Point at a text file the researcher saved from chat output, for cases where the assistant responded in conversation rather than writing files.
+
+---
+
+## Extension Points
+
+### Adding a New Objective
+
+1. Create objective definition in `src/cxp_canary/objectives/{objective_id}.py`
+2. Define validator rules (regex patterns that detect success)
+3. Register in the objective registry
+
+### Adding a New Assistant Format
+
+1. Create format definition in `src/cxp_canary/formats/{format_id}.py`
+2. Define the filename, syntax type, and any format-specific rendering rules
+3. Register in the format registry
+
+### Adding a New Technique
+
+1. Create technique template in `src/cxp_canary/techniques/{objective_id}/{format_id}/`
+2. Define the poisoned file template + trigger prompt + project skeleton
+3. Register in the technique registry
+4. Techniques are the cross-product — one objective applied to one format
+
+---
+
+## Security Considerations
+
+- Generated test repos contain intentionally malicious instruction files. The repos must be clearly labeled with warnings in README.md.
+- Output validator patterns must not be so broad they produce false positives — a "hit" must represent genuine vulnerability.
+- Bounty-ready PoC packages include potentially sensitive evidence. Encrypt or handle with care.
+- Responsible use policy required in README: test only against your own instances or vendors with active VDPs/bounty programs.
+- No automated submission to vendor APIs in Phase 1. Researcher controls all interaction.
+
+---
+
+## Documentation Standards
+
+- Google-style docstrings (Args, Returns, Raises, Example)
+- New modules get docstrings when created, not retrofitted
+- Inline comments for non-obvious logic only

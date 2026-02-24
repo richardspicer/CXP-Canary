@@ -1,0 +1,88 @@
+# Contributing to CXP-Canary
+
+CXP-Canary is an early-stage security research tool. Contributions are welcome — whether that's new techniques, format support, bug fixes, or documentation improvements.
+
+## How to Contribute
+
+1. **Open an issue first** to discuss your idea before writing code
+2. Fork the repo and create a feature branch (`feature/`, `fix/`, `docs/`)
+3. Follow the code standards below
+4. Submit a PR referencing the issue
+
+## Development Setup
+
+```bash
+# Clone and setup
+git clone https://github.com/richardspicer/CXP-Canary.git
+cd CXP-Canary
+
+# Install dependencies (creates .venv automatically)
+uv sync --group dev
+
+# Install pre-commit hooks
+pre-commit install
+
+# Verify
+cxp-canary --help
+```
+
+## Dev Tooling
+
+Pre-commit hooks run automatically on every `git commit`. They enforce:
+
+- **File hygiene** — trailing whitespace, EOF newlines, YAML/TOML syntax, large file detection, merge conflict markers
+- **No commits to main** — all work must happen on feature branches
+- **Ruff** — linting (pycodestyle, pyflakes, isort, bugbear, complexity, pyupgrade, bandit) and formatting
+- **Gitleaks** — secrets detection on staged diffs
+- **Mypy** — type checking with `check_untyped_defs` enabled
+
+If a hook fails, the commit is blocked. Auto-fixable issues (whitespace, import order, formatting) are corrected automatically — just re-stage and commit again.
+
+### Running checks manually
+
+```bash
+ruff check .                    # Lint
+ruff format --check .           # Format check (dry run)
+ruff format .                   # Format (apply)
+mypy src/cxp_canary/            # Type check
+pre-commit run --all-files      # Run all hooks against entire repo
+```
+
+## Code Standards
+
+- **Docstrings:** Google-style on all public functions, classes, and modules (Args, Returns, Raises, Example)
+- **Type annotations:** All new public functions should have type hints
+- **Formatting:** Handled by ruff. Line length is 100 characters
+- **Commits:** One logical change per commit, descriptive messages
+- **Testing:** Verify the CLI still works after changes: `cxp-canary --help`
+
+## Git Workflow
+
+**Never work directly on main.** The pre-commit hook blocks this.
+
+```bash
+# Start work
+git checkout main
+git pull
+git checkout -b feature/your-description   # or fix/, docs/, refactor/
+
+# Work and commit (hooks run automatically)
+git add .
+git commit -m "feat: description of change"
+
+# Push and open PR
+git push -u origin feature/your-description
+```
+
+### Branch naming
+
+| Prefix | Use |
+|--------|-----|
+| `feature/` | New functionality |
+| `fix/` | Bug fixes |
+| `docs/` | Documentation only |
+| `refactor/` | Code restructuring |
+
+## Questions?
+
+Open an issue or start a discussion. Happy to help you get oriented.

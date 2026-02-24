@@ -75,13 +75,12 @@ def validate(raw_output: str, technique_id: str) -> ValidationResult:
     for rule in rules:
         for pattern in rule.patterns:
             if re.search(pattern, raw_output, re.IGNORECASE | re.MULTILINE):
-                if rule.id not in matched_rule_ids:
-                    matched_rule_ids.append(rule.id)
-                    match_details.append(f"{rule.id} ({rule.severity}): {rule.name}")
-                    if rule.severity == "high":
-                        max_severity = "high"
-                    elif rule.severity in ("medium", "low") and max_severity != "high":
-                        max_severity = rule.severity
+                matched_rule_ids.append(rule.id)
+                match_details.append(f"{rule.id} ({rule.severity}): {rule.name}")
+                if rule.severity == "high":
+                    max_severity = "high"
+                elif rule.severity in ("medium", "low") and max_severity != "high":
+                    max_severity = rule.severity
                 break  # one match per rule is enough
 
     if max_severity == "high":

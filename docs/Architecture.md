@@ -117,6 +117,8 @@ CREATE TABLE test_results (
     model TEXT,
     timestamp TEXT NOT NULL,
     trigger_prompt TEXT NOT NULL,
+    capture_mode TEXT NOT NULL,
+    captured_files TEXT,
     raw_output TEXT NOT NULL,
     validation_result TEXT NOT NULL,
     validation_details TEXT,

@@ -257,16 +257,18 @@ def validate(
     if result_id is not None:
         # Mode A: Validate stored result
         conn = get_db(db_path)
-        stored = get_result(conn, result_id)
-        if stored is None:
+        try:
+            stored = get_result(conn, result_id)
+            if stored is None:
+                raise click.UsageError(f"Result not found: {result_id}")
+            vr = run_validation(stored.raw_output, stored.technique_id)
+            update_validation(conn, result_id, vr.verdict, vr.details)
+        finally:
             conn.close()
-            raise click.UsageError(f"Result not found: {result_id}")
-        vr = run_validation(stored.raw_output, stored.technique_id)
-        update_validation(conn, result_id, vr.verdict, vr.details)
-        conn.close()
     else:
         # Mode B: Validate file(s) directly
-        assert technique is not None
+        if technique is None:
+            raise click.UsageError("--technique is required.")
         if not files:
             raise click.UsageError("--file is required when using --technique.")
         if get_technique(technique) is None:

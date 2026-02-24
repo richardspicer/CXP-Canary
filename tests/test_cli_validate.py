@@ -97,6 +97,7 @@ class TestValidateCommand:
         conn.close()
         assert updated is not None
         assert updated.validation_result == "hit"
+        assert updated.validation_details != ""
 
     def test_validate_unknown_technique(self, tmp_path: Path) -> None:
         code_file = tmp_path / "code.py"
@@ -132,3 +133,4 @@ class TestValidateCommand:
     def test_validate_requires_result_or_technique(self) -> None:
         result = CliRunner().invoke(main, ["validate"])
         assert result.exit_code != 0
+        assert "Either --result or --technique is required" in result.output

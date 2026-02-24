@@ -255,3 +255,24 @@ def get_result(conn: sqlite3.Connection, result_id: str) -> TestResult | None:
     cursor = conn.execute("SELECT * FROM test_results WHERE id = ?", (result_id,))
     row = cursor.fetchone()
     return _row_to_result(row) if row else None
+
+
+def update_validation(
+    conn: sqlite3.Connection,
+    result_id: str,
+    validation_result: str,
+    validation_details: str,
+) -> None:
+    """Update the validation fields of a stored test result.
+
+    Args:
+        conn: An open SQLite connection.
+        result_id: The result UUID to update.
+        validation_result: New validation result ("hit", "miss", "partial").
+        validation_details: What the validator found.
+    """
+    conn.execute(
+        "UPDATE test_results SET validation_result = ?, validation_details = ? WHERE id = ?",
+        (validation_result, validation_details, result_id),
+    )
+    conn.commit()

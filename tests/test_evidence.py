@@ -7,10 +7,13 @@ import sqlite3
 from cxp_canary.evidence import (
     create_campaign,
     get_campaign,
+    get_result,
     init_db,
     list_campaigns,
+    list_results,
+    record_result,
 )
-from cxp_canary.models import Campaign
+from cxp_canary.models import Campaign, TestResult
 
 
 class TestInitDb:
@@ -69,3 +72,95 @@ class TestCampaignCrud:
         # newest first
         assert campaigns[0].name == "second"
         conn.close()
+
+
+class TestResultCrud:
+    def test_record_result_file_mode(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        init_db(conn)
+        campaign = create_campaign(conn, "test-campaign")
+        result = record_result(
+            conn,
+            campaign_id=campaign.id,
+            technique_id="backdoor-claude-md",
+            assistant="Claude Code",
+            trigger_prompt="Add authentication",
+            raw_output="def login(): pass",
+            capture_mode="file",
+            captured_files=["src/auth.py"],
+        )
+        assert isinstance(result, TestResult)
+        assert result.campaign_id == campaign.id
+        assert result.technique_id == "backdoor-claude-md"
+        assert result.capture_mode == "file"
+        assert result.captured_files == ["src/auth.py"]
+        assert result.validation_result == "pending"
+
+    def test_record_result_output_mode(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        init_db(conn)
+        campaign = create_campaign(conn, "test-campaign")
+        result = record_result(
+            conn,
+            campaign_id=campaign.id,
+            technique_id="exfil-cursorrules",
+            assistant="Cursor",
+            trigger_prompt="Refactor this",
+            raw_output="some chat output here",
+            capture_mode="output",
+        )
+        assert result.capture_mode == "output"
+        assert result.captured_files == []
+        assert result.raw_output == "some chat output here"
+
+    def test_get_result(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        init_db(conn)
+        campaign = create_campaign(conn, "test-campaign")
+        created = record_result(
+            conn,
+            campaign_id=campaign.id,
+            technique_id="backdoor-claude-md",
+            assistant="Claude Code",
+            trigger_prompt="Add auth",
+            raw_output="code here",
+            capture_mode="file",
+        )
+        fetched = get_result(conn, created.id)
+        assert fetched is not None
+        assert fetched.id == created.id
+        assert fetched.technique_id == "backdoor-claude-md"
+
+    def test_list_results_by_campaign(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        init_db(conn)
+        c1 = create_campaign(conn, "campaign-1")
+        c2 = create_campaign(conn, "campaign-2")
+        record_result(conn, c1.id, "t1", "a", "p", "o", "file")
+        record_result(conn, c1.id, "t2", "a", "p", "o", "file")
+        record_result(conn, c2.id, "t3", "a", "p", "o", "file")
+        results_c1 = list_results(conn, campaign_id=c1.id)
+        results_c2 = list_results(conn, campaign_id=c2.id)
+        results_all = list_results(conn)
+        assert len(results_c1) == 2
+        assert len(results_c2) == 1
+        assert len(results_all) == 3
+
+    def test_captured_files_round_trip(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        init_db(conn)
+        campaign = create_campaign(conn, "test")
+        files = ["src/auth.py", "src/utils.py", "tests/test_auth.py"]
+        result = record_result(
+            conn,
+            campaign_id=campaign.id,
+            technique_id="t1",
+            assistant="a",
+            trigger_prompt="p",
+            raw_output="o",
+            capture_mode="file",
+            captured_files=files,
+        )
+        fetched = get_result(conn, result.id)
+        assert fetched is not None
+        assert fetched.captured_files == files

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json as _json
 import sqlite3
 from collections import defaultdict
 from datetime import UTC, datetime
@@ -69,3 +70,54 @@ def generate_matrix(conn: sqlite3.Connection, campaign_id: str | None = None) ->
         "summary": summary,
         "matrix": matrix,
     }
+
+
+def matrix_to_markdown(matrix: dict) -> str:
+    """Render the matrix dict as a Markdown table.
+
+    Produces a summary stats block followed by a table with columns:
+    Technique | Objective | Format | Assistant | Model | Result.
+
+    Args:
+        matrix: The dict returned by generate_matrix().
+
+    Returns:
+        A Markdown-formatted string.
+    """
+    s = matrix["summary"]
+    lines = [
+        "# CXP-Canary Comparison Matrix",
+        "",
+        f"**Campaign:** {matrix['campaign']}  ",
+        f"**Generated:** {matrix['generated']}  ",
+        f"**Total: {s['total']}** | Hits: {s['hits']} | Misses: {s['misses']}"
+        f" | Partial: {s['partial']} | Pending: {s['pending']}",
+        "",
+        "| Technique | Objective | Format | Assistant | Model | Result |",
+        "|-----------|-----------|--------|-----------|-------|--------|",
+    ]
+
+    for entry in matrix["matrix"]:
+        for result in entry["results"]:
+            lines.append(
+                f"| {entry['technique_id']} | {entry['objective']} | {entry['format']}"
+                f" | {result['assistant']} | {result['model']}"
+                f" | {result['validation_result']} |"
+            )
+
+    if not matrix["matrix"]:
+        lines.append("| (no results) | | | | | |")
+
+    return "\n".join(lines) + "\n"
+
+
+def matrix_to_json(matrix: dict) -> str:
+    """Render the matrix dict as formatted JSON.
+
+    Args:
+        matrix: The dict returned by generate_matrix().
+
+    Returns:
+        A JSON string with 2-space indentation.
+    """
+    return _json.dumps(matrix, indent=2)

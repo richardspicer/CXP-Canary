@@ -97,6 +97,42 @@ class TestResult:
 
 
 @dataclass
+class ValidatorRule:
+    """A single detection pattern.
+
+    Args:
+        id: Rule identifier (e.g., "backdoor-hardcoded-cred").
+        objective_id: Which objective this rule belongs to.
+        name: Human-readable name.
+        description: What this pattern detects.
+        patterns: Regex patterns (any match = detection).
+        severity: Rule severity ("high", "medium", "low").
+    """
+
+    id: str
+    objective_id: str
+    name: str
+    description: str
+    patterns: list[str]
+    severity: str
+
+
+@dataclass
+class ValidationResult:
+    """Result of validating one piece of captured output.
+
+    Args:
+        verdict: Overall result ("hit", "miss", "partial").
+        matched_rules: Rule IDs that matched.
+        details: Human-readable summary of findings.
+    """
+
+    verdict: str
+    matched_rules: list[str]
+    details: str
+
+
+@dataclass
 class Campaign:
     """A testing session grouping multiple test results.
 

@@ -280,3 +280,95 @@ def validate(
     if vr.matched_rules:
         click.echo(f"Matched: {', '.join(vr.matched_rules)}")
     click.echo(f"Details: {vr.details}")
+
+
+@main.group()
+def report() -> None:
+    """Generate comparison matrices and PoC packages."""
+
+
+@report.command()
+@click.option("--campaign", "campaign_id", default=None, help="Filter to specific campaign.")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["markdown", "json"]),
+    default="markdown",
+    help="Output format (default: markdown).",
+)
+@click.option(
+    "--output",
+    "output_path",
+    default=None,
+    type=click.Path(path_type=Path),
+    help="Write to file instead of stdout.",
+)
+@click.option(
+    "--db",
+    "db_path",
+    default=None,
+    type=click.Path(path_type=Path),
+    help="Database path (default: ./cxp-canary.db).",
+)
+def matrix(
+    campaign_id: str | None,
+    output_format: str,
+    output_path: Path | None,
+    db_path: Path | None,
+) -> None:
+    """Generate an assistant comparison matrix."""
+    from cxp_canary.reporter import generate_matrix, matrix_to_json, matrix_to_markdown
+
+    conn = get_db(db_path)
+    try:
+        data = generate_matrix(conn, campaign_id=campaign_id)
+    finally:
+        conn.close()
+
+    if output_format == "json":
+        content = matrix_to_json(data)
+    else:
+        content = matrix_to_markdown(data)
+
+    if output_path:
+        output_path.write_text(content, encoding="utf-8")
+        click.echo(f"Report written to {output_path}")
+    else:
+        click.echo(content)
+
+
+@report.command()
+@click.option("--result", "result_id", required=True, help="Test result ID to package.")
+@click.option(
+    "--output",
+    "output_path",
+    default=None,
+    type=click.Path(path_type=Path),
+    help="Output zip path (default: ./poc-{technique}.zip).",
+)
+@click.option(
+    "--db",
+    "db_path",
+    default=None,
+    type=click.Path(path_type=Path),
+    help="Database path (default: ./cxp-canary.db).",
+)
+def poc(result_id: str, output_path: Path | None, db_path: Path | None) -> None:
+    """Export a bounty-ready PoC package."""
+    from cxp_canary.reporter import export_poc
+
+    conn = get_db(db_path)
+    try:
+        # Determine default output path from the result's technique
+        if output_path is None:
+            stored = get_result(conn, result_id)
+            if stored is None:
+                raise click.UsageError(f"Result not found: {result_id}")
+            output_path = Path(f"poc-{stored.technique_id}.zip")
+
+        created = export_poc(conn, result_id, output_path)
+        click.echo(f"PoC package: {created}")
+    except ValueError as e:
+        raise click.UsageError(str(e)) from None
+    finally:
+        conn.close()

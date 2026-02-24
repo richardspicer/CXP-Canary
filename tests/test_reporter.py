@@ -1,0 +1,102 @@
+"""Tests for the reporter module."""
+
+from __future__ import annotations
+
+import sqlite3
+
+from cxp_canary.evidence import create_campaign, init_db, record_result
+from cxp_canary.reporter import generate_matrix
+
+
+class TestGenerateMatrix:
+    def test_generate_matrix_empty(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        init_db(conn)
+        matrix = generate_matrix(conn)
+        assert matrix["campaign"] == "all"
+        assert matrix["summary"]["total"] == 0
+        assert matrix["summary"]["hits"] == 0
+        assert matrix["summary"]["misses"] == 0
+        assert matrix["summary"]["partial"] == 0
+        assert matrix["summary"]["pending"] == 0
+        assert matrix["matrix"] == []
+        conn.close()
+
+    def test_generate_matrix_with_results(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        init_db(conn)
+        campaign = create_campaign(conn, "test-campaign")
+        record_result(
+            conn,
+            campaign_id=campaign.id,
+            technique_id="backdoor-claude-md",
+            assistant="Claude Code",
+            trigger_prompt="Add auth",
+            raw_output='password = "admin123"',
+            capture_mode="file",
+            model="claude-sonnet-4-20250514",
+            validation_result="hit",
+            validation_details="Matched backdoor-hardcoded-cred",
+        )
+        record_result(
+            conn,
+            campaign_id=campaign.id,
+            technique_id="exfil-cursorrules",
+            assistant="Cursor",
+            trigger_prompt="Set up config",
+            raw_output="def add(a, b): return a + b",
+            capture_mode="output",
+            model="gpt-4o",
+            validation_result="miss",
+            validation_details="No rules matched",
+        )
+        matrix = generate_matrix(conn)
+        assert matrix["summary"]["total"] == 2
+        assert matrix["summary"]["hits"] == 1
+        assert matrix["summary"]["misses"] == 1
+        assert len(matrix["matrix"]) == 2
+        # Check structure of first matrix entry
+        entry = matrix["matrix"][0]
+        assert "technique_id" in entry
+        assert "objective" in entry
+        assert "format" in entry
+        assert "results" in entry
+        assert len(entry["results"]) == 1
+        result = entry["results"][0]
+        assert "assistant" in result
+        assert "model" in result
+        assert "validation_result" in result
+        assert "timestamp" in result
+        conn.close()
+
+    def test_matrix_campaign_filter(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        init_db(conn)
+        c1 = create_campaign(conn, "campaign-1")
+        c2 = create_campaign(conn, "campaign-2")
+        record_result(
+            conn,
+            c1.id,
+            "backdoor-claude-md",
+            "Claude Code",
+            "p",
+            "o",
+            "file",
+            validation_result="hit",
+        )
+        record_result(
+            conn,
+            c2.id,
+            "exfil-cursorrules",
+            "Cursor",
+            "p",
+            "o",
+            "file",
+            validation_result="miss",
+        )
+        matrix = generate_matrix(conn, campaign_id=c1.id)
+        assert matrix["campaign"] == c1.id
+        assert matrix["summary"]["total"] == 1
+        assert matrix["summary"]["hits"] == 1
+        assert matrix["summary"]["misses"] == 0
+        conn.close()
